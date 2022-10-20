@@ -1,0 +1,11 @@
+flask==2.1.0
+gunicorn==20.1.0
+opentelemetry-distro
+opentelemetry-exporter-gcp-trace
+opentelemetry-propagator-gcp
+opentelemetry-api
+opentelemetry-sdk
+requests
+opentelemetry-instrumentation-requests
+opentelemetry-instrumentation-flask
+google-cloud-logging
