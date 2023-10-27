@@ -1,3 +1,5 @@
+"""This simulates a client-side application."""
+
 import requests
 import time
 from opentelemetry import trace
