@@ -1,4 +1,5 @@
 import os
+from re import I
 import time
 from random import randint
 from flask import Flask, request
@@ -11,9 +12,13 @@ from opentelemetry.propagators.cloud_trace_propagator import (
 )
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+import googlecloudprofiler
 
-PROJECT_ID = "ninth-moment-365704"
 
+
+PROJECT_ID = os.environ.get('PROJECT_ID', "ninth-moment-365704")
+
+counter = 0
 
 # for logging
 from google.cloud import logging as gclogging
@@ -37,6 +42,21 @@ def write_log(span_context, message: str):
         }
     )
 
+
+# Profiler initialization. It starts a daemon thread which continuously
+# collects and uploads profiles. Best done as early as possible.
+try:
+    googlecloudprofiler.start(
+        service=os.environ.get("K_SERVICE",'default'),
+        service_version='0.1.2',
+        # verbose is the logging level. 0-error, 1-warning, 2-info,
+        # 3-debug. It defaults to 0 (error) if not set.
+        verbose=3,
+        # project_id must be set if not running on GCP.
+        project_id=PROJECT_ID,
+    )
+except (ValueError, NotImplementedError) as exc:
+    print(exc)  # Handle errors here
 
 # For propagation
 set_global_textmap(CloudTraceFormatPropagator())
@@ -62,12 +82,17 @@ app = Flask(__name__)
 # Instrument flask
 FlaskInstrumentor().instrument_app(app)
 
+def span_config():
+    trace.get_current_span().set_attribute("run.service_name", os.environ.get("K_SERVICE",'unknown'))
+    trace.get_current_span().set_attribute("run.service_revision", os.environ.get("K_REVISION",'unknown') )
+    trace.get_current_span().set_attribute("run.service_configuration", os.environ.get("K_CONFIGURATION", 'unknown') )
 
 @app.route("/")
 def hello_world():
+    span_config()
     time.sleep(1)
     name = os.environ.get("NAME", "World")
-    trace.get_current_span().get_span_context()
+
     write_log(trace.get_current_span().get_span_context(), f"Received name of {name}")
     return "Hello {}!".format(name)
 
@@ -75,7 +100,14 @@ def hello_world():
 # open telemetry route
 @app.route("/rolldice")
 def roll_dice():
-    return str(do_roll())
+    span_config()
+    global counter 
+    counter += 1
+    trace.get_current_span().set_attribute("rolldice.callSeq", counter)
+    if counter % 2 :
+        return "I'm a Teapot", 418
+    else:
+        return str(do_roll())
 
 
 def do_roll():

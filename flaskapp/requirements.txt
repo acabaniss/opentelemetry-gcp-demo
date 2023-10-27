@@ -9,3 +9,4 @@ requests
 opentelemetry-instrumentation-requests
 opentelemetry-instrumentation-flask
 google-cloud-logging
+google-cloud-profiler
